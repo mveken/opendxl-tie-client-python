@@ -5,13 +5,20 @@
 
 import base64
 import json
+from datetime import datetime
 from dxlclient import Request, Message
-from constants import FileProvider, ReputationProp, CertProvider, CertReputationProp, CertReputationOverriddenProp
+from constants import FileProvider, ReputationProp, CertProvider, CertReputationProp, CertReputationOverriddenProp, HashType
 
 # Topic used to set the reputation of a file
 TIE_SET_FILE_REPUTATION_TOPIC = "/mcafee/service/tie/file/reputation/set"
 # Topic used to retrieve the reputation of a file
 TIE_GET_FILE_REPUTATION_TOPIC = "/mcafee/service/tie/file/reputation"
+
+# Topic used to get detailed information of a file
+TIE_GET_FILE_INFO_TOPIC = "/mcafee/service/tie/file/info"
+
+# Topic used to search for a file by its name and get detailed info of the files
+TIE_SEARCH_FILE_BY_NAME = "/mcafee/service/tie/file/search"
 
 # Topic used to set the reputation of a certificate
 TIE_SET_CERT_REPUTATION_TOPIC = "/mcafee/service/tie/cert/reputation/set"
@@ -321,6 +328,98 @@ class TieClient(object):
         # Transform reputations to be simpler to use
         if "reputations" in resp_dict:
             return TieClient._transform_reputations(resp_dict["reputations"])
+        else:
+            return {}
+
+    def get_file_info(self, hashes):
+        """
+        Retrieves detailed information for the specified file (as identified by hashes)
+
+        At least one `hash value` of a particular `hash type` (MD5, SHA-1, etc.) must be specified.
+
+        **Example Usage**
+
+            .. code-block:: python
+
+                # Determine reputations for file (identified by hashes)
+                file_info_dict = \\
+                    tie_client.get_file_info({
+                        HashType.MD5: "f2c7bb8acc97f92e987a2d4087d021b1",
+                        HashType.SHA1: "7eb0139d2175739b3ccb0d1110067820be6abd29",
+                        HashType.SHA256: "142e1d688ef0568370c37187fd9f2351d7ddeda574f8bfa9b0fa4ef42db85aa2"
+                    })
+                    
+        Sample output + info
+        
+        :param hashes: A ``dict`` (dictionary) of hashes that identify the file to retrieve the info for.
+            The ``key`` in the dictionary is the `hash type` and the ``value`` is the `hex` representation of the
+            hash value. See the :class:`dxltieclient.constants.HashType` class for the list of `hash type`
+            constants.
+        :return:
+        """
+        # Create the request message
+        req = Request(TIE_GET_FILE_INFO_TOPIC)
+
+        # Create a dictionary for the payload
+        payload_dict = {"hashes": []}
+
+        # This topic needs an extra list layer
+        payload_dict["hashes"].append([])
+
+        for key, value in hashes.items():
+            payload_dict["hashes"][0].append({"type": key, "value": base64.b64encode(value.decode('hex'))})
+
+        # Set the payload
+        req.payload = json.dumps(payload_dict).encode(encoding="UTF-8")
+
+        # Send the request
+        response = self.__dxl_sync_request(req)
+
+        resp_dict = json.loads(response.payload.decode(encoding="UTF-8"))
+
+        # Transform reputations to be simpler to use
+        if len(resp_dict) > 0:
+            return TieClient._transform_file_info(resp_dict)
+        else:
+            return {}
+
+    def search_files(self, search_string, query_limit=500):
+        """
+        Search for files by (a part of) its name and retrieves detailed information for these files.
+
+        **Example Usage**
+
+            .. code-block:: python
+
+                # Determine reputations for file (identified by hashes)
+                file_search_dict = \\
+                    tie_client.search_files(
+                        "bad_file.exe",
+                        100
+                    )
+
+        Sample output + info
+
+        :param search_string: A ``string`` that contains a (part of) the filename to search for
+        :param query_limit: The maximum number of results to return
+        :return:
+        """
+        # Create the request message
+        req = Request(TIE_SEARCH_FILE_BY_NAME)
+
+        # Create the dictionary for the payload
+        payload_dict = {"searchString": search_string, "numberOfRows": query_limit}
+
+        # Set the payload
+        req.payload = json.dumps(payload_dict).encode(encoding="UTF-8")
+
+        # Send the request
+        response = self.__dxl_sync_request(req)
+
+        resp_dict = json.loads(response.payload.decode(encoding="UTF-8"))
+
+        if "results" in resp_dict:
+            return TieClient._transform_reputations(resp_dict["results"])
         else:
             return {}
 
@@ -732,3 +831,39 @@ class TieClient(object):
 
         return reputations_dict
 
+    @staticmethod
+    def _transform_file_infos(file_infos):
+        """
+        Transforms a dictionary of file info objects from the standard TIE format to a simplified
+        form (hex vs base64 hashes, timestamps, etc.)
+        :param file_infos: The dictionary of file info objects in the standard TIE format
+        :return: A dictionary file info objects in a simplified form
+        """
+        for file_info in file_infos:
+            TieClient._transform_file_info(file_info)
+
+    @staticmethod
+    def _transform_file_info(file_info):
+        """
+        Transforms a file info object from the standard TIE format to a simplified
+        form (hex vs base64 hashes, timestamps, etc.)
+        :param file_info: File info in the standard TIE format
+        :return: The file info in a simplified form
+        """
+        # Transform hash values to readable
+        file_info[HashType.MD5] = TieClient._base64_to_hex(file_info[HashType.MD5])
+        file_info[HashType.SHA256] = TieClient._base64_to_hex(file_info[HashType.SHA256])
+        file_info[HashType.SHA1] = TieClient._base64_to_hex(file_info[HashType.SHA1])
+
+        # Transform Unix timestamp to readable
+        file_info["firstContact"] = TieClient._transform_unix_to_datetime(file_info["firstContact"])
+        file_info["lastAccess"] = TieClient._transform_unix_to_datetime(file_info["lastAccess"])
+
+    @staticmethod
+    def _transform_unix_to_datetime(unix_timestamp):
+        """
+        Transforms a unix timestamp into a python datetime object
+        :param unix_timestamp: The dictionary of reputation in the standard TIE format
+        :return: The timestamp as a python datetime object
+        """
+        return datetime.fromtimestamp(int(str(unix_timestamp)[:-3])).strftime('%Y-%m-%d %H:%M:%S')
