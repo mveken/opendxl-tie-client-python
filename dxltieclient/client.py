@@ -341,7 +341,7 @@ class TieClient(object):
 
             .. code-block:: python
 
-                # Determine reputations for file (identified by hashes)
+                # Retrieve information for file (identified by hashes)
                 file_info_dict = \\
                     tie_client.get_file_info({
                         HashType.MD5: "f2c7bb8acc97f92e987a2d4087d021b1",
@@ -349,13 +349,80 @@ class TieClient(object):
                         HashType.SHA256: "142e1d688ef0568370c37187fd9f2351d7ddeda574f8bfa9b0fa4ef42db85aa2"
                     })
                     
-        Sample output + info
+        **File**
+
+        The file that matches one of the hashes is returned as a Python ``dictionary``.
+
+        An example ``list`` is shown below:
+
+            .. code-block:: python
+                {
+                    "atdReputation": null,
+                    "atdReputationLastRefresh": null,
+                    "badRepCount": null,
+                    "certEnterpriseReputation": 0,
+                    "certGtiReputation": 99,
+                    "certSha1": "49da9a5e21edc4682ad0211c85d552c86c422f13",
+                    "comment": null,
+                    "company": null,
+                    "compositeReputation": " 099|2",
+                    "ctdReputation": null,
+                    "ctdReputationLastRefresh": null,
+                    "detectionCount": null,
+                    "enterpriseCount": 1,
+                    "enterpriseReputation": null,
+                    "enterpriseReputationLastRefresh": null,
+                    "fileNameCount": null,
+                    "fileParents": null,
+                    "filePathCount": null,
+                    "filePaths": null,
+                    "fileRules": null,
+                    "fileType": 16,
+                    "firstContact": "2016-12-13 15:50:43",
+                    "firstReference": null,
+                    "goodRepCount": null,
+                    "gtiReputation": null,
+                    "gtiReputationLastRefresh": null,
+                    "lastAccess": "2017-01-23 15:09:24",
+                    "lastDetectionName": null,
+                    "lastUpdate": null,
+                    "latestRuleId": null,
+                    "localRepCount": null,
+                    "localRepLatest": null,
+                    "localRepMax": null,
+                    "localRepMin": null,
+                    "localRepSum": null,
+                    "md5": "b32189bdff6e577a92baa61ad49264e6",
+                    "mwgReputation": null,
+                    "mwgReputationLastRefresh": null,
+                    "names": [
+                        "NOTEPAD.EXE"
+                    ],
+                    "parentRepCount": null,
+                    "parentRepMax": null,
+                    "parentRepMin": null,
+                    "parentRepSum": null,
+                    "prevalent": false,
+                    "productName": null,
+                    "productVersion": null,
+                    "profilerFlags": "",
+                    "promptRepCount": null,
+                    "promptRepMax": null,
+                    "promptRepMin": null,
+                    "promptRepSum": null,
+                    "sha1": "a7bbc4b4f781e04214ecebe69a766c76681aa7eb",
+                    "sha256": "933e1778b2760b3a9194c2799d7b76052895959c3caedefb4e9d764cbb6ad3b5",
+                    "signedBits": null,
+                    "size": null,
+                    "urlRep": null,
+                    "version": null
+                }
         
         :param hashes: A ``dict`` (dictionary) of hashes that identify the file to retrieve the info for.
             The ``key`` in the dictionary is the `hash type` and the ``value`` is the `hex` representation of the
             hash value. See the :class:`dxltieclient.constants.HashType` class for the list of `hash type`
             constants.
-        :return:
+        :return: a file info dict
         """
         # Create the request message
         req = Request(TIE_GET_FILE_INFO_TOPIC)
@@ -363,7 +430,7 @@ class TieClient(object):
         # Create a dictionary for the payload
         payload_dict = {"hashes": []}
 
-        # This topic needs an extra list layer
+        # This topic needs an extra list layer in the payload
         payload_dict["hashes"].append([])
 
         for key, value in hashes.items():
@@ -378,8 +445,10 @@ class TieClient(object):
         resp_dict = json.loads(response.payload.decode(encoding="UTF-8"))
 
         # Transform reputations to be simpler to use
-        if len(resp_dict) > 0:
-            return TieClient._transform_file_info(resp_dict)
+        if "results" in resp_dict and len(resp_dict["results"]) > 0:
+            file_info = resp_dict["results"][0]
+            TieClient._transform_file_info(file_info)
+            return file_info
         else:
             return {}
 
@@ -391,18 +460,87 @@ class TieClient(object):
 
             .. code-block:: python
 
-                # Determine reputations for file (identified by hashes)
+                # Retrieve information for files (identified by (a part of) its name)
                 file_search_dict = \\
                     tie_client.search_files(
                         "bad_file.exe",
                         100
                     )
 
-        Sample output + info
+        **Files**
+
+        The files that match the search string are returned as a Python ``list``.
+
+        An example ``list`` is shown below:
+
+            .. code-block:: python
+                [
+                    {
+                        "atdReputation": null,
+                        "atdReputationLastRefresh": null,
+                        "badRepCount": null,
+                        "certEnterpriseReputation": 0,
+                        "certGtiReputation": 99,
+                        "certSha1": "49da9a5e21edc4682ad0211c85d552c86c422f13",
+                        "comment": null,
+                        "company": null,
+                        "compositeReputation": " 099|2",
+                        "ctdReputation": null,
+                        "ctdReputationLastRefresh": null,
+                        "detectionCount": null,
+                        "enterpriseCount": 1,
+                        "enterpriseReputation": null,
+                        "enterpriseReputationLastRefresh": null,
+                        "fileNameCount": null,
+                        "fileParents": null,
+                        "filePathCount": null,
+                        "filePaths": null,
+                        "fileRules": null,
+                        "fileType": 16,
+                        "firstContact": "2016-12-13 15:50:43",
+                        "firstReference": null,
+                        "goodRepCount": null,
+                        "gtiReputation": null,
+                        "gtiReputationLastRefresh": null,
+                        "lastAccess": "2017-01-23 15:09:24",
+                        "lastDetectionName": null,
+                        "lastUpdate": null,
+                        "latestRuleId": null,
+                        "localRepCount": null,
+                        "localRepLatest": null,
+                        "localRepMax": null,
+                        "localRepMin": null,
+                        "localRepSum": null,
+                        "md5": "b32189bdff6e577a92baa61ad49264e6",
+                        "mwgReputation": null,
+                        "mwgReputationLastRefresh": null,
+                        "names": [
+                            "NOTEPAD.EXE"
+                        ],
+                        "parentRepCount": null,
+                        "parentRepMax": null,
+                        "parentRepMin": null,
+                        "parentRepSum": null,
+                        "prevalent": false,
+                        "productName": null,
+                        "productVersion": null,
+                        "profilerFlags": "",
+                        "promptRepCount": null,
+                        "promptRepMax": null,
+                        "promptRepMin": null,
+                        "promptRepSum": null,
+                        "sha1": "a7bbc4b4f781e04214ecebe69a766c76681aa7eb",
+                        "sha256": "933e1778b2760b3a9194c2799d7b76052895959c3caedefb4e9d764cbb6ad3b5",
+                        "signedBits": null,
+                        "size": null,
+                        "urlRep": null,
+                        "version": null
+                    }
+                ]
 
         :param search_string: A ``string`` that contains a (part of) the filename to search for
         :param query_limit: The maximum number of results to return
-        :return:
+        :return: a list of file info dicts
         """
         # Create the request message
         req = Request(TIE_SEARCH_FILE_BY_NAME)
@@ -419,9 +557,11 @@ class TieClient(object):
         resp_dict = json.loads(response.payload.decode(encoding="UTF-8"))
 
         if "results" in resp_dict:
-            return TieClient._transform_reputations(resp_dict["results"])
+            file_infos = resp_dict["results"]
+            TieClient._transform_file_infos(file_infos)
+            return file_infos
         else:
-            return {}
+            return []
 
     def get_file_first_references(self, hashes, query_limit=500):
         """
@@ -834,10 +974,9 @@ class TieClient(object):
     @staticmethod
     def _transform_file_infos(file_infos):
         """
-        Transforms a dictionary of file info objects from the standard TIE format to a simplified
+        Transforms a list of file info objects from the standard TIE format to a simplified
         form (hex vs base64 hashes, timestamps, etc.)
-        :param file_infos: The dictionary of file info objects in the standard TIE format
-        :return: A dictionary file info objects in a simplified form
+        :param file_infos: The list of file info objects in the standard TIE format
         """
         for file_info in file_infos:
             TieClient._transform_file_info(file_info)
@@ -848,22 +987,29 @@ class TieClient(object):
         Transforms a file info object from the standard TIE format to a simplified
         form (hex vs base64 hashes, timestamps, etc.)
         :param file_info: File info in the standard TIE format
-        :return: The file info in a simplified form
         """
         # Transform hash values to readable
-        file_info[HashType.MD5] = TieClient._base64_to_hex(file_info[HashType.MD5])
-        file_info[HashType.SHA256] = TieClient._base64_to_hex(file_info[HashType.SHA256])
-        file_info[HashType.SHA1] = TieClient._base64_to_hex(file_info[HashType.SHA1])
+        hash_fields = [HashType.MD5, HashType.SHA256, HashType.SHA1, "certSha1"]
 
-        # Transform Unix timestamp to readable
-        file_info["firstContact"] = TieClient._transform_unix_to_datetime(file_info["firstContact"])
-        file_info["lastAccess"] = TieClient._transform_unix_to_datetime(file_info["lastAccess"])
+        for hash_field in hash_fields:
+            file_info[hash_field] = TieClient._base64_to_hex(file_info[hash_field])
+
+        # Transform Unix timestamp to human readable
+        timestamp_fields = ["firstContact", "lastAccess", "firstReference", "lastUpdate", "enterpriseReputationLastRefresh",
+                            "mwgReputationLastRefresh", "gtiReputationLastRefresh", "atdReputationLastRefresh",
+                            "ctdReputationLastRefresh"]
+
+        for timestamp_field in timestamp_fields:
+            file_info[timestamp_field] = TieClient._transform_unix_to_datetime(file_info[timestamp_field])
 
     @staticmethod
     def _transform_unix_to_datetime(unix_timestamp):
         """
-        Transforms a unix timestamp into a python datetime object
+        Transforms a unix timestamp into a human readable string
         :param unix_timestamp: The dictionary of reputation in the standard TIE format
-        :return: The timestamp as a python datetime object
+        :return: The timestamp as a string
         """
-        return datetime.fromtimestamp(int(str(unix_timestamp)[:-3])).strftime('%Y-%m-%d %H:%M:%S')
+        if unix_timestamp is not None:
+            return datetime.fromtimestamp(unix_timestamp/1000).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            return None
